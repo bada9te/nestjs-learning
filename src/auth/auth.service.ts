@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectModel } from "@nestjs/mongoose";
@@ -29,10 +29,17 @@ export class AuthService {
         }
 
         // return the JWT signed user
-        return this.signToken(user._id.toString(), user.email);
+        return {
+            accessToken: await this.signToken(user._id.toString(), user.email),
+        }
     };
 
     async register(dto: AuthDto) {
+        // check if user with this email already exists
+        const userInDB = await this.userModel.findOne({ email: dto.email });
+        if (userInDB) {
+            throw new BadRequestException("User already exists");
+        }
         // gen passwd
         const hash = await argon.hash(dto.password);
         // save user in DB
@@ -40,7 +47,9 @@ export class AuthService {
             email: dto.email, password: hash
         }]);
         // return JWT signed user
-        return this.signToken(user[0]._id.toString(), user[0].email);
+        return {
+            accessToken: await this.signToken(user[0]._id.toString(), user[0].email),
+        }
     };
 
     signToken(userId: string, email: string) {
